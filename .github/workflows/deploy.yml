@@ -59,3 +59,5 @@ jobs:
           kubectl wait --for=condition=ready pod -l app=mysql --timeout=60s
           # 執行還原
           kubectl exec -i deployment/mysql -- mysql -u root -prootpassword inventory_db < backup.sql
+          # 查看新產生的公開 IP
+          kubectl get services
