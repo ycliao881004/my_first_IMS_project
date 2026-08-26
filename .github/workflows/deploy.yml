@@ -3,7 +3,7 @@ name: Build and Deploy to GKE
 on:
   push:
     branches:
-      - main
+      - main # 當推送到 main 分支時自動觸發
   workflow_dispatch:
 
 env:
@@ -20,29 +20,42 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v3
 
+      # 1. 登入 GCP
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v1
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
 
+      # 2. 設定 Google Cloud SDK
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v1
 
+      # 3. 登入 Artifact Registry (Docker)
       - name: Configure Docker for GCP
         run: gcloud auth configure-docker ${{ env.GAR_LOCATION }}-docker.pkg.dev --quiet
 
+      # 4. 打包並推送前端映像檔
       - name: Build & Push Frontend
         run: |
           docker build -t ${{ env.GAR_LOCATION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/inventory-frontend:${{ github.sha }} ./ims-react
           docker push ${{ env.GAR_LOCATION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/inventory-frontend:${{ github.sha }}
 
+      # 5. 連線至 GKE
       - name: Connect to GKE
         uses: google-github-actions/get-gke-credentials@v1
         with:
           cluster_name: ${{ env.GKE_CLUSTER }}
           location: ${{ env.GKE_ZONE }}
 
+      # 6. 自動更新 GKE 上的前端映像檔
       - name: Deploy to GKE
         run: |
           kubectl set image deployment/frontend frontend=${{ env.GAR_LOCATION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/inventory-frontend:${{ github.sha }}
           kubectl rollout status deployment/frontend
+      # 7. 自動還原資料庫備份
+      - name: Restore MySQL Backup
+        run: |
+          # 等待 MySQL Pod 準備就緒（最多等待 60 秒）
+          kubectl wait --for=condition=ready pod -l app=mysql --timeout=60s
+          # 執行還原
+          kubectl exec -i deployment/mysql -- mysql -u root -prootpassword inventory_db < backup.sql
