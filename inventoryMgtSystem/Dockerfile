@@ -22,8 +22,13 @@ WORKDIR /app
 # 從階段 1 複製打包好的 JAR 檔
 COPY --from=build /app/target/*.jar app.jar
 
+# 下載官方最新版 OpenTelemetry Java Agent（分散式追蹤）
+RUN apk add --no-cache wget ca-certificates \
+    && wget -qO /app/opentelemetry-javaagent.jar \
+       https://github.com/open-telemetry/opentelemetry-java-instrumentation/releases/latest/download/opentelemetry-javaagent.jar
+
 # 暴露 Spring Boot 預設的 8080 連接埠
 EXPOSE 8080
 
-# 啟動容器時執行的指令
-ENTRYPOINT ["java", "-jar", "app.jar"]
+# 以 OTel Java Agent 啟動應用
+ENTRYPOINT ["java", "-javaagent:/app/opentelemetry-javaagent.jar", "-jar", "app.jar"]

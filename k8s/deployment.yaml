@@ -59,6 +59,14 @@ spec:
           value: "root"
         - name: SPRING_DATASOURCE_PASSWORD
           value: "rootpassword"
+        - name: OTEL_SERVICE_NAME
+          value: "ims-backend"
+        - name: OTEL_EXPORTER_OTLP_ENDPOINT
+          value: "http://tempo-service:4317"
+        - name: OTEL_EXPORTER_OTLP_PROTOCOL
+          value: "grpc"
+        - name: OTEL_METRICS_EXPORTER
+          value: "none"
         ports:
         - containerPort: 5050
 ---
