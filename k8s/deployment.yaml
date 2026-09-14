@@ -48,11 +48,24 @@ spec:
       labels:
         app: backend
     spec:
+      initContainers:
+      - name: fetch-otel-agent
+        image: busybox:latest
+        command:
+        - sh
+        - -c
+        - |
+          wget -O /otel/opentelemetry-javaagent.jar https://github.com/open-telemetry/opentelemetry-java-instrumentation/releases/latest/download/opentelemetry-javaagent.jar
+        volumeMounts:
+        - name: otel-agent-volume
+          mountPath: /otel
       containers:
       - name: backend
         image: asia-east1-docker.pkg.dev/ims-k8s-proj-2026/inventory-repo/inventory-backend:v1
         imagePullPolicy: Always
         env:
+        - name: JAVA_TOOL_OPTIONS
+          value: "-javaagent:/otel/opentelemetry-javaagent.jar"
         - name: SPRING_DATASOURCE_URL
           value: "jdbc:mysql://mysql-service:3306/inventory_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC"
         - name: SPRING_DATASOURCE_USERNAME
@@ -69,6 +82,12 @@ spec:
           value: "none"
         ports:
         - containerPort: 5050
+        volumeMounts:
+        - name: otel-agent-volume
+          mountPath: /otel
+      volumes:
+      - name: otel-agent-volume
+        emptyDir: {}
 ---
 apiVersion: v1
 kind: Service

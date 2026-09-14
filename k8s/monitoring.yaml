@@ -134,20 +134,23 @@ data:
           protocols:
             grpc:
               endpoint: 0.0.0.0:4317
-            http:
-              endpoint: 0.0.0.0:4318
     ingester:
-      max_block_duration: 5m
+      lifecycler:
+        ring:
+          kvstore:
+            store: inmemory
+          replication_factor: 1
     compactor:
-      compaction:
-        block_retention: 1h
+      ring:
+        kvstore:
+          store: inmemory
     storage:
       trace:
         backend: local
-        wal:
-          path: /var/tempo/wal
         local:
-          path: /var/tempo/blocks
+          path: /tmp/tempo/traces
+        wal:
+          path: /tmp/tempo/wal
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -165,9 +168,8 @@ spec:
     spec:
       containers:
       - name: tempo
-        image: grafana/tempo:latest
-        args:
-          - "-config.file=/etc/tempo/tempo.yaml"
+        image: grafana/tempo:2.4.1
+        args: ["-config.file=/etc/tempo/tempo.yaml"]
         ports:
         - name: otlp-grpc
           containerPort: 4317
@@ -178,7 +180,7 @@ spec:
           mountPath: /etc/tempo/tempo.yaml
           subPath: tempo.yaml
         - name: tempo-data
-          mountPath: /var/tempo
+          mountPath: /tmp/tempo
       volumes:
       - name: tempo-config
         configMap:
