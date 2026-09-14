@@ -10,6 +10,7 @@ import com.phegondev.InventoryMgtSystem.exceptions.NotFoundException;
 import com.phegondev.InventoryMgtSystem.models.User;
 import com.phegondev.InventoryMgtSystem.repositories.UserRepository;
 import com.phegondev.InventoryMgtSystem.security.JwtUtils;
+import com.phegondev.InventoryMgtSystem.services.IAMMetricsService;
 import com.phegondev.InventoryMgtSystem.services.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -32,6 +33,7 @@ public class UserServiceImpl implements UserService {
     private final PasswordEncoder passwordEncoder;
     private final ModelMapper modelMapper;
     private final JwtUtils jwtUtils;
+    private final IAMMetricsService iamMetricsService;
 
     @Override
     public Response registerUser(RegisterRequest registerRequest) {
@@ -59,10 +61,15 @@ public class UserServiceImpl implements UserService {
     @Override
     public Response loginUser(LoginRequest loginRequest) {
         User user = userRepository.findByEmail(loginRequest.getEmail())
-                .orElseThrow(()->new NotFoundException("Email Not Found"));
-        if (!passwordEncoder.matches(loginRequest.getPassword(), user.getPassword())){
+                .orElseThrow(() -> {
+                    iamMetricsService.recordLoginAttempt(false, "user_not_found");
+                    return new NotFoundException("Email Not Found");
+                });
+        if (!passwordEncoder.matches(loginRequest.getPassword(), user.getPassword())) {
+            iamMetricsService.recordLoginAttempt(false, "bad_credentials");
             throw new InvalidCredentialsException("Password Does Not Match");
         }
+        iamMetricsService.recordLoginAttempt(true, "none");
         String token = jwtUtils.generateToken(user.getEmail());
 
         return Response.builder()
